@@ -235,9 +235,13 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   centerX = W / 2; centerY = H / 2;
 
-  // 반응형 스케일 계산 — 제곱근 커브로 모바일에서 더 공격적으로 축소
+  // 반응형 스케일 — 대각선 기반 + 짧은 축 보정
+  // iframe 임베드(가로 넓고 세로 짧은) 경우도 자연스럽게 처리
   const diag = Math.sqrt(W * W + H * H);
-  scale = Math.min(Math.pow(diag / 2000, 1.3), 1);
+  const minDim = Math.min(W, H);
+  const diagScale = Math.pow(diag / 2000, 1.3);
+  const minScale = Math.pow(minDim / 800, 1.2); // 높이 400px → 0.38
+  scale = Math.min(diagScale, minScale, 1);
 
   initPoints();
 }
