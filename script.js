@@ -76,7 +76,9 @@ function sampleSentence(idx) {
   const words = sentence.split(' ');
   let fontSize, lines, lh;
 
-  let lo = 10, hi = Math.min(aw * 0.5, ah * 0.8);
+  // 폰트 사이즈 상한: 높이가 작은 iframe에서는 제한
+  const maxFontSize = Math.min(aw * 0.5, ah * 0.8, H * 0.12);
+  let lo = 10, hi = maxFontSize;
   for (let i = 0; i < 30; i++) {
     fontSize = (lo + hi) / 2;
     lh = fontSize * 1.1;
@@ -312,10 +314,10 @@ function animate() {
     }
 
     let x = baseX, y = baseY;
-    let sLen = 2 + 1 * s;
+    let sLen = 1.5 + 1.5 * s;
     let sAng = p.angle;
     let op = 0.9;
-    let sW = 1 + 0.4 * s;
+    let sW = 0.6 + 0.8 * s;
 
     // Phase 1: Micro jitter (0–30)
     if (t > 0) {
