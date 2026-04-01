@@ -68,9 +68,11 @@ function sampleSentence(idx) {
   off.width = W; off.height = H;
 
   // 모바일에서 패딩을 줄여서 텍스트 영역 최대화
+  // 하단은 슬라이더 영역(~100px) 확보
   const padRatio = W < 500 ? 0.04 : 0.07;
   const px = W * padRatio, py = H * padRatio;
-  const aw = W - px * 2, ah = H - py * 2;
+  const bottomReserve = W < 500 ? 110 : 90;
+  const aw = W - px * 2, ah = H - py - bottomReserve;
   const words = sentence.split(' ');
   let fontSize, lines, lh;
 
@@ -132,11 +134,43 @@ function wrap(octx, words, maxW) {
   for (const w of words) {
     const test = cur ? cur + ' ' + w : w;
     if (octx.measureText(test).width > maxW && cur) {
-      lines.push(cur); cur = w;
-    } else cur = test;
+      lines.push(cur);
+      // 단어 자체가 maxW보다 길면 하이픈으로 분할
+      if (octx.measureText(w).width > maxW) {
+        const parts = hyphenate(octx, w, maxW);
+        for (let pi = 0; pi < parts.length - 1; pi++) lines.push(parts[pi]);
+        cur = parts[parts.length - 1];
+      } else {
+        cur = w;
+      }
+    } else if (octx.measureText(test).width > maxW && !cur) {
+      // 첫 단어부터 넘침
+      const parts = hyphenate(octx, w, maxW);
+      for (let pi = 0; pi < parts.length - 1; pi++) lines.push(parts[pi]);
+      cur = parts[parts.length - 1];
+    } else {
+      cur = test;
+    }
   }
-  lines.push(cur);
+  if (cur) lines.push(cur);
   return lines;
+}
+
+function hyphenate(octx, word, maxW) {
+  const parts = [];
+  let remaining = word;
+  while (octx.measureText(remaining).width > maxW) {
+    // 글자를 하나씩 늘려가며 하이픈 포함 너비 체크
+    let cut = 1;
+    while (cut < remaining.length && octx.measureText(remaining.slice(0, cut + 1) + '-').width <= maxW) {
+      cut++;
+    }
+    if (cut < 2) cut = 2; // 최소 2글자
+    parts.push(remaining.slice(0, cut) + '-');
+    remaining = remaining.slice(cut);
+  }
+  parts.push(remaining);
+  return parts;
 }
 
 /* ---- INIT ---- */
@@ -201,9 +235,9 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   centerX = W / 2; centerY = H / 2;
 
-  // 반응형 스케일 계산
+  // 반응형 스케일 계산 — 제곱근 커브로 모바일에서 더 공격적으로 축소
   const diag = Math.sqrt(W * W + H * H);
-  scale = Math.min(diag / 1600, 1);
+  scale = Math.min(Math.pow(diag / 2000, 1.3), 1);
 
   initPoints();
 }
