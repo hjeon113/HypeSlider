@@ -67,18 +67,15 @@ function sampleSentence(idx) {
   const octx = off.getContext('2d');
   off.width = W; off.height = H;
 
-  // 모바일에서 패딩을 줄여서 텍스트 영역 최대화
-  // 하단은 슬라이더 영역(~100px) 확보
-  const padRatio = W < 500 ? 0.04 : 0.07;
+  // 패딩을 최소화해서 텍스트가 화면 비율에 맞게 최대한 커지도록
+  const padRatio = W < 500 ? 0.03 : 0.04;
   const px = W * padRatio, py = H * padRatio;
-  const bottomReserve = W < 500 ? 110 : 90;
-  const aw = W - px * 2, ah = H - py - bottomReserve;
+  const aw = W - px * 2, ah = H - py * 2;
   const words = sentence.split(' ');
   let fontSize, lines, lh;
 
-  // 폰트 사이즈 상한: 높이가 작은 iframe에서는 제한
-  const maxFontSize = Math.min(aw * 0.5, ah * 0.8, H * 0.12);
-  let lo = 10, hi = maxFontSize;
+  // 상한선 제거 - 화면 크기 자체가 한계
+  let lo = 10, hi = Math.min(aw, ah);
   for (let i = 0; i < 30; i++) {
     fontSize = (lo + hi) / 2;
     lh = fontSize * 1.1;
@@ -136,43 +133,29 @@ function wrap(octx, words, maxW) {
   for (const w of words) {
     const test = cur ? cur + ' ' + w : w;
     if (octx.measureText(test).width > maxW && cur) {
-      lines.push(cur);
-      // 단어 자체가 maxW보다 길면 하이픈으로 분할
-      if (octx.measureText(w).width > maxW) {
-        const parts = hyphenate(octx, w, maxW);
-        for (let pi = 0; pi < parts.length - 1; pi++) lines.push(parts[pi]);
-        cur = parts[parts.length - 1];
-      } else {
-        cur = w;
+      lines.push(cur); cur = '';
+    }
+    // 단어 자체가 한 줄을 넘으면 하이픈으로 분절
+    if (octx.measureText(w).width > maxW) {
+      if (cur) { lines.push(cur); cur = ''; }
+      let chunk = '';
+      for (const ch of w) {
+        const tryChunk = chunk + ch;
+        // '-' 자리 확보를 위해 한 글자 더 들어갈 공간 체크
+        if (octx.measureText(tryChunk + '-').width > maxW && chunk) {
+          lines.push(chunk + '-');
+          chunk = ch;
+        } else {
+          chunk = tryChunk;
+        }
       }
-    } else if (octx.measureText(test).width > maxW && !cur) {
-      // 첫 단어부터 넘침
-      const parts = hyphenate(octx, w, maxW);
-      for (let pi = 0; pi < parts.length - 1; pi++) lines.push(parts[pi]);
-      cur = parts[parts.length - 1];
+      cur = chunk;
     } else {
-      cur = test;
+      cur = cur ? cur + ' ' + w : w;
     }
   }
   if (cur) lines.push(cur);
   return lines;
-}
-
-function hyphenate(octx, word, maxW) {
-  const parts = [];
-  let remaining = word;
-  while (octx.measureText(remaining).width > maxW) {
-    // 글자를 하나씩 늘려가며 하이픈 포함 너비 체크
-    let cut = 1;
-    while (cut < remaining.length && octx.measureText(remaining.slice(0, cut + 1) + '-').width <= maxW) {
-      cut++;
-    }
-    if (cut < 2) cut = 2; // 최소 2글자
-    parts.push(remaining.slice(0, cut) + '-');
-    remaining = remaining.slice(cut);
-  }
-  parts.push(remaining);
-  return parts;
 }
 
 /* ---- INIT ---- */
@@ -237,13 +220,9 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   centerX = W / 2; centerY = H / 2;
 
-  // 반응형 스케일 — 대각선 기반 + 짧은 축 보정
-  // iframe 임베드(가로 넓고 세로 짧은) 경우도 자연스럽게 처리
+  // 반응형 스케일 계산
   const diag = Math.sqrt(W * W + H * H);
-  const minDim = Math.min(W, H);
-  const diagScale = Math.pow(diag / 2000, 1.3);
-  const minScale = Math.pow(minDim / 800, 1.2); // 높이 400px → 0.38
-  scale = Math.min(diagScale, minScale, 1);
+  scale = Math.min(diag / 1600, 1);
 
   initPoints();
 }
@@ -314,10 +293,10 @@ function animate() {
     }
 
     let x = baseX, y = baseY;
-    let sLen = 1.5 + 1.5 * s;
+    let sLen = 2 + 1 * s;
     let sAng = p.angle;
     let op = 0.9;
-    let sW = 0.6 + 0.8 * s;
+    let sW = 1 + 0.4 * s;
 
     // Phase 1: Micro jitter (0–30)
     if (t > 0) {
